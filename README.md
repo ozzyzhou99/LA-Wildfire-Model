@@ -28,15 +28,6 @@ This project implements an agent-based wildfire evacuation simulation for Los An
 3. Click **Setup** to initialize the environment, then **Go** to start the simulation.
 4. Optionally, configure and run **BehaviorSpace** experiments to collect batch results.
 
-## Results
-
-* Simulation outputs (CSV) are saved in the `data/` folder.
-* Use R or Python analysis scripts from `scripts/` to generate visualizations and statistical summaries.
-
 ## Contributing
 
-Contributions are welcome! Please open an issue or submit a pull request. See `docs/CONTRIBUTING.md` for guidelines.
-
-## License
-
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+Contributions are welcome! Please open an issue or submit a pull request. 
