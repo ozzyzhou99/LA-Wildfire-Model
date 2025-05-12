@@ -1,7 +1,3 @@
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;  Wildfire Evacuation ABM + FCM Emotion & Social Contagion (rev-15)
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 extensions [ gis table ]
 
 breed [ responders responder ]
@@ -19,11 +15,11 @@ globals [
   house-raster street-raster sea-raster
   house-table street-table sea-table
   data-loaded?
-  social-radius           ;; 感染半径
-  contagion-matrix        ;; 情绪传染系数矩阵
+  social-radius           ;; radius of infection
+  contagion-matrix        ;; Matrix of emotional contagion coefficients
   tracked-turtle
-  fire-centers     ;; 记录初始火源 patch 列表
-  fire-radius      ;; 当前火势半径
+  fire-centers     ;; Record initial fire patch list
+  fire-radius      ;; Current fire radius
   fire-speed-patch-per-tick
 ]
 
@@ -53,7 +49,7 @@ evacuees-own [
 
 
 ;;;========================
-;;; 初始化与设置
+;;; Initialization and Setup
 ;;;========================
 
 to load-data
@@ -104,8 +100,8 @@ end
 
 
 to setup-contagion-matrix
-  ;; contagion-matrix[i][j]: 邻居情绪 i 对 自身情绪 j 的传染强度
-  ;; 情绪索引：0=calm,1=panic,2=anxious
+  ;; contagion-matrix[i][j]: contagion strength of neighbor's emotion i to self's emotion j
+  ;; Mood Index: 0=calm,1=panic,2=anxious
   set contagion-matrix
   (list
     (list 0.1  0.2  0.3)   ;; neighbor=calm
@@ -169,7 +165,7 @@ end
 
 to spread-fire
   set fire-radius fire-radius + fire-speed-patch-per-tick
-  ;; 标记新被烧到的 patches
+  ;; Mark newly burned patches
   ask patches with [ not is-fire? ] [
     if any? fire-centers with [ distance myself <= fire-radius ] [
       set is-fire?    true
@@ -180,7 +176,7 @@ to spread-fire
 end
 
 ;;;========================
-;;; 生成 Agents
+;;; Generate Agents
 ;;;========================
 
 to setup-evacuees
@@ -213,21 +209,21 @@ to setup-evacuees
       set behavior "calm"
       set social-influence 0
 
-      ;; 🔄 Path planning + route-switch tracking
+      ;; Path planning + route-switch tracking
       let target-road min-one-of roads [ distance myself ]
       let destination one-of exits
       set evac-path sentence (list target-road) (a-star-path target-road destination)
       set route-switch-count 1  ;; first path
 
-      ;; 💡 Emotion model
+      ;; Emotion model
       compute-emotion
       set emotion-state behavior
 
-      ;; 🕐 Time trackers
+      ;; Time trackers
       set stuck-duration 0
       set exposure-flag 0
 
-      ;; 🚗 Driving speed setup: 10 km/h → 0.278 patch/sec
+      ;; Driving speed setup: 10 km/h → 0.278 patch/sec
       set evac-speed 10 / 3.6 / 10
       set distance-to-move 0
     ]
@@ -246,7 +242,7 @@ to setup-responders
     set mode "rescue"
     choose-new-destination
 
-    ;; 🚑 Driving speed: 45 mph → 2.012 patch/sec
+    ;; Driving speed: 45 mph → 2.012 patch/sec
     set rescue-speed 45 * 1609.34 / 3600 / 10
     set distance-to-move 0
   ]
@@ -283,25 +279,25 @@ to move-responder
   while [is-list? destination-path and path-index < length destination-path and distance-to-move >= 1] [
     let next-patch item path-index destination-path
 
-    ;; 🔥 Abort if next patch is on fire
+    ;; Abort if next patch is on fire
     if [is-fire?] of next-patch [
       if mode = "rescue" [ choose-new-destination ]
       stop
     ]
 
-    ;; 🚗 Move one patch forward
+    ;; Move one patch forward
     move-to next-patch
     set path-index path-index + 1
     set distance-to-move distance-to-move - 1
 
-    ;; 🎯 If reached target patch, pick next goal
+    ;; If reached target patch, pick next goal
     if path-index >= length destination-path and mode = "rescue" [
       choose-new-destination
       stop
     ]
   ]
 
-  ;; 🛑 If evacuating and reached exit, remove responder
+  ;; If evacuating and reached exit, remove responder
   if is-exit? and mode = "evacuate" [
     die
   ]
@@ -335,7 +331,7 @@ end
 
 
 ;;;========================
-;;; 主循环
+;;; primary cycle
 ;;;========================
 
 to go
@@ -378,19 +374,19 @@ to move-evacuee
   while [distance-to-move >= 1 and path-index < length evac-path] [
     let next-patch item path-index evac-path
 
-    ;; 🔥 Exposure check
+    ;; Exposure check
     if [is-fire?] of next-patch [
       set exposure-flag 1
       set waiting? true
       stop
     ]
 
-    ;; 🚶 Move one step
+    ;; Move one step
     move-to next-patch
     set path-index path-index + 1
     set distance-to-move distance-to-move - 1
 
-    ;; 🎯 Check for exit
+    ;; Check for exit
     if is-exit? [
       die
     ]
@@ -400,7 +396,7 @@ end
 
 
 ;;;========================
-;;; A* 路径搜索（不变）
+;;; A* Path search
 ;;;========================
 to-report a-star-path [ src dst ]
   let open-list (list src)
@@ -442,7 +438,7 @@ end
 
 
 ;;;========================
-;;; 社交影响计算
+;;; Social Influence Calculator
 ;;;========================
 
 to compute-social-influence
@@ -451,18 +447,16 @@ to compute-social-influence
   if any? close-turtles [
     let sum-w 0
     ask close-turtles [
-      ;; 距离衰减
       let d distance myself
       let dist-weight (1 / (1 + d))
-      ;; 取邻居的行为
       let nb-behavior behavior
-      ;; 取自己的行为（用 reporter 块）
+      ;; Fetch your own behavior (with reporter blocks)
       let self-behavior [behavior] of myself
-      ;; 在 contagion-matrix 里查传染系数
+      ;; check contagion coefficient in contagion-matrix
       let i position nb-behavior ["calm" "panic" "anxious"]
       let j position self-behavior ["calm" "panic" "anxious"]
       let emo-weight item j (item i contagion-matrix)
-      ;; 组合权重
+      ;; portfolio weighting
       let w dist-weight * emo-weight
       set sum-w sum-w + w
       set social-influence social-influence + (emotion-level * w)
@@ -476,11 +470,10 @@ end
 
 
 ;;;========================
-;;; 情绪计算：引入社交影响
+;;; Sentiment calculation: introducing social influence
 ;;;========================
 
 to compute-emotion
-  ;; 自身地理因素
   let exit-p min-one-of patches with [is-exit?] [distance myself]
   let road-p min-one-of patches with [pcolor = gray + 2] [distance myself]
   let fire-p min-one-of patches with [is-fire?] [distance myself]
@@ -488,21 +481,20 @@ to compute-emotion
   let norm-road 1 - (distance road-p / 200)
   let norm-fire 1 - (distance fire-p / 200)
 
-  ;; 社交影响
   compute-social-influence
 
-  ;; 线性组合 + tanh 激活
+  ;; linear combination + tanh activation
   let raw
   ((-0.4  * income-level)
     + (-0.6  * norm-exit)
     + (-0.5  * norm-road)
     + (1   * norm-fire)
-    + (0.7   * social-influence))  ;; social-influence 权重可调
+    + (0.7   * social-influence))  ;; social-influence adjustable weights
   set emotion-level tanh raw
 end
 
 ;;;========================
-;;; 行为决策（不变）
+;;; Behavioral decision-making
 ;;;========================
 
 to update-behavior
@@ -528,9 +520,8 @@ to update-behavior
   ]
 end
 
-to act-based-on-behavior  ;; 根据当前 behavior 行动
+to act-based-on-behavior
   if behavior = "panic" [
-    ; 冻结状态：什么都不做
     stop
   ]
   if behavior = "calm" [
@@ -540,25 +531,24 @@ to act-based-on-behavior  ;; 根据当前 behavior 行动
   ]
 
   if behavior = "anxious" [
-    ; 恐慌状态：随机四邻居乱跑
     anxious-move
   ]
 end
 
 to anxious-move
-  ;; 🧭 Choose random 4-connected neighbor that is not on fire or blocked
+  ;; Choose random 4-connected neighbor that is not on fire or blocked
   let choices neighbors4 with [travel-cost < 999 and not is-fire?]
 
   if any? choices [
     let target one-of choices
 
-    ;; 🔥 If stepping into fire
+    ;; If stepping into fire
     if [is-fire?] of target [
       set exposure-flag 1
       die
     ]
 
-    ;; 🚶 Move randomly
+    ;; Move randomly
     move-to target
     set path-index path-index + 1  ;; optional, useful if you still want to count steps
   ]
@@ -568,7 +558,7 @@ end
 
 
 ;;;========================
-;;; 辅助 reporter
+;;; ancillary reporter
 ;;;========================
 
 to-report tanh [ x ]
@@ -940,39 +930,29 @@ PENS
 @#$#@#$#@
 ## WHAT IS IT?
 
-(a general understanding of what the model is trying to show or explain)
+An ABM on wildfire evacuation.
 
 ## HOW IT WORKS
 
-(what rules the agents use to create the overall behavior of the model)
+Combined with FCM to simulate the emotion impact.
 
 ## HOW TO USE IT
 
-(how to use the model, including a description of each of the items in the Interface tab)
+1. Launch NetLogo and load the model from the models/ directory (e.g., WildfireEvacuation.nlogo).
+2. Adjust simulation parameters in the interface, such as low-income-count, social-radius, and contagion-rate.
+3. Click Setup to initialize the environment, then Go to start the simulation.
 
 ## THINGS TO NOTICE
 
-(suggested things for the user to notice while running the model)
+Load data before setup
 
 ## THINGS TO TRY
 
-(suggested things for the user to try to do (move sliders, switches, etc.) with the model)
+You can adjust parameters in the model to simulate different senarios.
 
 ## EXTENDING THE MODEL
 
-(suggested things to add or change in the Code tab to make the model more complicated, detailed, accurate, etc.)
-
-## NETLOGO FEATURES
-
-(interesting or unusual features of NetLogo that the model uses, particularly in the Code tab; or where workarounds were needed for missing features)
-
-## RELATED MODELS
-
-(models in the NetLogo Models Library and elsewhere which are of related interest)
-
-## CREDITS AND REFERENCES
-
-(a reference to the model's URL on the web if it has one, as well as any other necessary credits, citations, and links)
+Maybe you can try to use a lager study area.
 @#$#@#$#@
 default
 true
