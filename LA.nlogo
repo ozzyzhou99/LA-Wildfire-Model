@@ -84,7 +84,6 @@ to setup
   ask patches [ set plabel "" ]
   ask patches with [ is-exit? ] [ set plabel "exit" ]
 
-  ;; 🧠 TICK COUNTER MUST START **BEFORE** using ticks
   reset-ticks
 
   setup-evacuees
