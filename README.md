@@ -27,6 +27,7 @@ This project implements an agent-based wildfire evacuation simulation for Los An
 2. Adjust simulation parameters in the interface, such as `low-income-count`, `social-radius`, and `contagion-rate`.
 3. Click **Setup** to initialize the environment, then **Go** to start the simulation.
 4. Optionally, configure and run **BehaviorSpace** experiments to collect batch results.
+5. A detailed description of the model based around the standard Overview, Design concepts, and Details (ODD) protocol can be found here.[https://github.com/ozzyzhou99/LA-Wildfire-Model/blob/main/ODD.pdf](https://github.com/ozzyzhou99/LA-Wildfire-Model/blob/main/ODD.pdf)
 
 ## Contributing
 
